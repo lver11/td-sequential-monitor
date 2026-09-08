@@ -3,7 +3,29 @@ import streamlit as st
 import yfinance as yf
 
 
-st.set_page_config(page_title="TD Sequential Monitor", layout="wide")
+st.set_page_config(page_title="TD Sequential Monitor", layout="wide", initial_sidebar_state="expanded")
+
+st.markdown(
+    """
+    <style>
+    .stApp { background: #0e131a; color: #f4efe4; }
+    [data-testid="stSidebar"] { background: #161d27; }
+    h1, h2, h3 { font-family: Georgia, serif; color: #f4efe4; }
+    .hero { padding: 1.6rem 0 1rem; border-bottom: 1px solid rgba(142,164,184,.18); }
+    .kicker { color: #c58a3a; text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; }
+    .hero p { color: #a8b1bf; font-size: 1.05rem; }
+    .signal-buy { color: #9ae0b8; font-weight: 700; }
+    .signal-sell { color: #f0a29a; font-weight: 700; }
+    .signal-neutral { color: #b7d2ea; font-weight: 700; }
+    </style>
+    <div class="hero">
+      <div class="kicker">TD Sequential scanner</div>
+      <h1>Signaux Tom DeMark sur une watchlist éditable</h1>
+      <p>Actions, indices, matières premières, devises et taux avec résumé des setups 9 et countdowns 13.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 PRESETS = {
@@ -76,11 +98,15 @@ with st.sidebar:
     period = st.selectbox("Historique", ["6mo", "1y", "2y", "5y"], index=1)
     interval = st.selectbox("Intervalle", ["1d", "1wk", "1mo"])
     scan_button = st.button("Lancer le scan", type="primary", use_container_width=True)
+    st.caption("Les données sont récupérées via Yahoo Finance. Les symboles canadiens utilisent le suffixe .TO.")
 
 symbols = list(dict.fromkeys(line.strip().upper() for line in symbols_text.splitlines() if line.strip()))
 st.metric("Titres suivis", len(symbols))
 
 if scan_button:
+    st.session_state["scan_requested"] = True
+
+if st.session_state.get("scan_requested", True):
     rows = []
     progress = st.progress(0)
     status = st.empty()
@@ -98,6 +124,11 @@ if scan_button:
     status.write("Analyse terminée.")
     result_frame = pd.DataFrame(rows)
     st.subheader("Résumé des signaux")
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Titres suivis", len(result_frame))
+    metric_cols[1].metric("Signaux BUY", int(result_frame["Signal"].str.contains("Buy", na=False).sum()))
+    metric_cols[2].metric("Signaux SELL", int(result_frame["Signal"].str.contains("Sell", na=False).sum()))
+    metric_cols[3].metric("Setup / countdown 9-13", int(result_frame["Signal"].str.contains("9|13", na=False).sum()))
     st.dataframe(result_frame, use_container_width=True, hide_index=True)
     csv = result_frame.to_csv(index=False).encode("utf-8")
     st.download_button("Exporter le résumé CSV", csv, "td-sequential-signaux.csv", "text/csv")
