@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TD Sequential Watchlist</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="kicker">TD Sequential scanner</p>
+          <h1>Un système simple pour suivre des signaux Tom DeMark sur une watchlist éditable.</h1>
+          <p class="lede">
+            Modifie la liste de titres quand tu veux, colle des données OHLC en CSV, puis
+            laisse le moteur calculer les setups et countdowns TD Sequential.
+          </p>
+        </div>
+        <div class="hero-status">
+          <div class="status-card status-card--large">
+            <span class="status-label">Dernier signal global</span>
+            <strong id="globalSignal">Aucun signal chargé</strong>
+            <span id="globalSignalMeta">Ajoute des données pour lancer l’analyse.</span>
+          </div>
+          <div class="mini-grid">
+            <article class="mini-stat">
+              <span class="mini-label">Titres suivis</span>
+              <strong id="watchlistCount">0</strong>
+            </article>
+            <article class="mini-stat">
+              <span class="mini-label">Series analysées</span>
+              <strong id="seriesCount">0</strong>
+            </article>
+            <article class="mini-stat">
+              <span class="mini-label">Dernière barre</span>
+              <strong id="latestDate">—</strong>
+            </article>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel config-panel">
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Watchlist</h2>
+              <button class="ghost-button" id="resetWatchlist" type="button">Réinitialiser</button>
+            </div>
+            <p class="help-copy">
+              Un titre par ligne. Tu peux mettre des actions, ETF, futures ou tout autre
+              instrument financier.
+            </p>
+            <textarea id="watchlistInput" spellcheck="false" aria-label="Watchlist"></textarea>
+            <div class="inline-actions">
+              <button class="primary-button" id="saveWatchlist" type="button">Sauvegarder</button>
+              <button class="ghost-button" id="addExample" type="button">Exemple</button>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Univers d’indice</h2>
+              <span class="source-pill">Modifiable</span>
+            </div>
+            <p class="help-copy">
+              Sélectionne un univers, colle sa composition ou importe un fichier texte/CSV, puis ajoute
+              les symboles à la watchlist. Pour Toronto, utilise les suffixes Yahoo comme <code>SHOP.TO</code>.
+            </p>
+            <label>
+              <span class="metric-label">Indice</span>
+              <select id="indexUniverse">
+                <optgroup label="Indices actions">
+                  <option value="sp500">S&amp;P 500</option>
+                  <option value="nasdaq100">Nasdaq-100</option>
+                  <option value="tsx60">S&amp;P/TSX 60</option>
+                </optgroup>
+                <optgroup label="Matières premières">
+                  <option value="commodities">Principales matières premières</option>
+                </optgroup>
+                <optgroup label="Devises">
+                  <option value="fx">Paires de devises majeures</option>
+                </optgroup>
+                <optgroup label="Taux d’intérêt">
+                  <option value="rates">Taux et futures de taux</option>
+                </optgroup>
+                <optgroup label="Personnalisé">
+                  <option value="custom">Univers personnalisé</option>
+                </optgroup>
+              </select>
+            </label>
+            <button class="ghost-button full-button" id="fetchIndexComposition" type="button">Actualiser la composition en ligne</button>
+            <label class="file-button file-button--wide">
+              <input id="indexFile" type="file" accept=".txt,.csv,text/plain,text/csv" />
+              Importer une composition
+            </label>
+            <textarea id="indexInput" class="compact-textarea" spellcheck="false" aria-label="Composition de l'indice"></textarea>
+            <p class="form-note">Les modèles affichés sont des exemples modifiables. Importe la composition complète pour couvrir tous les constituants actuels.</p>
+            <div class="inline-actions">
+              <button class="primary-button" id="addIndexSymbols" type="button">Ajouter à la watchlist</button>
+              <button class="ghost-button" id="replaceWithIndex" type="button">Remplacer</button>
+            </div>
+            <span class="market-status" id="indexStatus">0 symbole chargé</span>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Données OHLC</h2>
+              <label class="file-button">
+                <input id="csvFile" type="file" accept=".csv,text/csv" />
+                Importer un CSV
+              </label>
+            </div>
+            <p class="help-copy">
+              Format attendu: <code>symbol,date,open,high,low,close,volume</code>.
+            </p>
+            <textarea
+              id="csvInput"
+              spellcheck="false"
+              aria-label="Données OHLC en CSV"
+            ></textarea>
+            <div class="inline-actions">
+              <button class="primary-button" id="scanNow" type="button">Scanner</button>
+              <button class="ghost-button" id="loadSample" type="button">Charger un exemple</button>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Marché</h2>
+              <span class="source-pill">Yahoo Finance</span>
+            </div>
+            <p class="help-copy">
+              Récupère les chandelles historiques pour les symboles de la watchlist. Les données sont
+              indicatives et peuvent dépendre des limites du fournisseur.
+            </p>
+            <div class="control-grid">
+              <label>
+                <span class="metric-label">Intervalle</span>
+                <select id="marketInterval">
+                  <option value="1d">Journalier</option>
+                  <option value="1wk">Hebdomadaire</option>
+                  <option value="1mo">Mensuel</option>
+                </select>
+              </label>
+              <label>
+                <span class="metric-label">Historique</span>
+                <select id="marketRange">
+                  <option value="6mo">6 mois</option>
+                  <option value="1y" selected>1 an</option>
+                  <option value="2y">2 ans</option>
+                  <option value="5y">5 ans</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-actions">
+              <button class="primary-button" id="fetchMarket" type="button">Actualiser le marché</button>
+              <span class="market-status" id="marketStatus">Mode CSV actif</span>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Alertes locales</h2>
+              <span class="source-pill" id="alertStatus">Inactives</span>
+            </div>
+            <p class="help-copy">Notification dans ce navigateur quand un setup 9 ou countdown 13 apparaît.</p>
+            <button class="ghost-button full-button" id="enableAlerts" type="button">Activer les alertes</button>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <h2>Lecture rapide</h2>
+            </div>
+            <ul class="notes">
+              <li><strong>Setup</strong>: 9 clôtures consécutives contre la clôture 4 barres plus tôt.</li>
+              <li><strong>Countdown</strong>: 13 clôtures validées contre le plus bas ou plus haut de 2 barres plus tôt.</li>
+              <li><strong>Perfection</strong>: repère visuel quand les barres 8 ou 9 valident la structure.</li>
+            </ul>
+          </section>
+        </aside>
+
+        <section class="panel results-panel">
+          <div class="section-head results-head">
+            <div>
+              <h2>Résultats</h2>
+              <p class="help-copy">
+                Chaque carte résume l’état TD Sequential du titre le plus récent.
+              </p>
+            </div>
+            <button class="ghost-button" id="clearResults" type="button">Vider les résultats</button>
+            <button class="ghost-button" id="exportResults" type="button">Exporter CSV</button>
+          </div>
+
+          <div class="insight-bar" id="insightBar" hidden>
+            <span class="insight-dot"></span>
+            <span id="insightText"></span>
+          </div>
+
+          <section class="summary-section" id="summarySection" hidden>
+            <div class="summary-head">
+              <div>
+                <h3>Résumé des signaux</h3>
+                <p class="help-copy">Vue rapide de tous les titres analysés.</p>
+              </div>
+              <div class="summary-filters" role="group" aria-label="Filtrer les signaux">
+                <button class="filter-button is-active" data-summary-filter="all" type="button">Tous</button>
+                <button class="filter-button" data-summary-filter="buy" type="button">Buy</button>
+                <button class="filter-button" data-summary-filter="sell" type="button">Sell</button>
+                <button class="filter-button" data-summary-filter="actionable" type="button">9 / 13</button>
+              </div>
+            </div>
+            <div class="summary-table-wrap">
+              <table class="summary-table">
+                <thead>
+                  <tr>
+                    <th>Titre</th>
+                    <th>Clôture</th>
+                    <th>Setup</th>
+                    <th>Countdown</th>
+                    <th>Signal</th>
+                    <th>Barre</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTableBody"></tbody>
+              </table>
+              <p class="summary-empty" id="summaryEmpty" hidden>Aucun titre dans ce filtre.</p>
+            </div>
+          </section>
+
+          <div id="resultsEmpty" class="empty-state">
+            Charge un CSV ou colle des données pour afficher les signaux TD Sequential.
+          </div>
+
+          <div id="resultsGrid" class="results-grid" hidden></div>
+
+          <details class="method-card">
+            <summary>Méthode utilisée dans ce système</summary>
+            <div class="method-body">
+              <p>
+                L’implémentation suit la logique TD Sequential classique: setup de 9 barres
+                basé sur la comparaison avec la clôture 4 barres plus tôt, puis countdown
+                jusqu’à 13 avec validation contre les extrêmes de 2 barres plus tôt.
+              </p>
+              <p>
+                C’est une base de travail opérationnelle pour scanner une watchlist. Si tu veux,
+                on peut ensuite l’étendre avec filtres de liquidité, alertes, export CSV ou
+                connexion à une source de marché en temps réel.
+              </p>
+            </div>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <template id="resultCardTemplate">
+      <article class="result-card">
+        <div class="result-topline">
+          <div>
+            <h3 class="symbol"></h3>
+            <p class="date-range"></p>
+          </div>
+          <span class="badge"></span>
+        </div>
+
+        <div class="price-row">
+          <div>
+            <span class="metric-label">Dernière clôture</span>
+            <strong class="price"></strong>
+          </div>
+          <div>
+            <span class="metric-label">Setup</span>
+            <strong class="setup"></strong>
+          </div>
+          <div>
+            <span class="metric-label">Countdown</span>
+            <strong class="countdown"></strong>
+          </div>
+        </div>
+
+        <div class="signal-strip">
+          <span class="signal-line"></span>
+          <strong class="signal-text"></strong>
+        </div>
+
+        <div class="detail-grid">
+          <div>
+            <span class="metric-label">Perfection</span>
+            <strong class="perfection"></strong>
+          </div>
+          <div>
+            <span class="metric-label">Direction active</span>
+            <strong class="direction"></strong>
+          </div>
+          <div>
+            <span class="metric-label">Dernière validation</span>
+            <strong class="validation"></strong>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-head">
+            <span>Dernières barres</span>
+            <span class="timeline-caption"></span>
+          </div>
+          <div class="timeline-bars"></div>
+        </div>
+
+        <div class="chart-wrap">
+          <div class="timeline-head">
+            <span>Prix / clôture</span>
+            <span class="chart-caption"></span>
+          </div>
+          <svg class="price-chart" viewBox="0 0 520 112" role="img" aria-label="Graphique de clôture"></svg>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
